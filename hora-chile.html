@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hora en Chile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --sky-top: #0b1d3a;
+    --sky-mid: #16335f;
+    --sky-low: #2f5a8f;
+    --ridge: #08142a;
+    --ridge-2: #0d2040;
+    --fg: #f3f7ff;
+    --fg-soft: rgba(243, 247, 255, .68);
+    --line: rgba(243, 247, 255, .28);
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  :root[data-phase="dawn"]  { --sky-top:#3a3a7a; --sky-mid:#c8688a; --sky-low:#ffb785; --ridge:#2a2350; --ridge-2:#4a3768; --fg:#fff8f2; --fg-soft:rgba(255,248,242,.78); --line:rgba(255,248,242,.38); }
+  :root[data-phase="day"]   { --sky-top:#1f6fd1; --sky-mid:#4fa3ee; --sky-low:#bfe3ff; --ridge:#2b4f7a; --ridge-2:#4a76a6; --fg:#ffffff; --fg-soft:rgba(255,255,255,.86); --line:rgba(255,255,255,.45); }
+  :root[data-phase="dusk"]  { --sky-top:#2a2154; --sky-mid:#b5476a; --sky-low:#ff9a5a; --ridge:#1b1438; --ridge-2:#3a2450; --fg:#fff6ee; --fg-soft:rgba(255,246,238,.8); --line:rgba(255,246,238,.4); }
+  :root[data-phase="night"] { --sky-top:#050d1f; --sky-mid:#0f2447; --sky-low:#1f4373; }
+
+  *, *::before, *::after { box-sizing: inherit; margin: 0; }
+  html { height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  @media (min-width: 1800px) { html { font-size: 20px; } }
+  @media (min-width: 2500px) { html { font-size: 28px; } }
+  body {
+    height: 100%;
+    min-height: 100%;
+    background: var(--sky-top);
+    background: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-low) 100%);
+    color: var(--fg);
+    font-family: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: relative;
+  }
+  main {
+    margin: auto;
+    position: relative;
+    z-index: 2;
+    width: min(100%, 70rem);
+    padding: 1.5rem clamp(.75rem, 5vw, 3rem) max(12vh, 110px);
+    text-align: center;
+  }
+  .place { font-size: clamp(1rem, 2.6vw, 1.35rem); font-weight: 500; }
+  .date  { margin-top: .35rem; font-size: clamp(.9rem, 2.2vw, 1.1rem); color: var(--fg-soft); text-transform: capitalize; }
+
+  .t12 {
+    margin-top: clamp(1.5rem, 5vh, 3rem);
+    font-weight: 300;
+    font-size: clamp(2.6rem, min(14vw, 19vh), 9rem);
+    line-height: 1;
+    letter-spacing: -.03em;
+    font-variant-numeric: tabular-nums;
+    display: flex; justify-content: center; align-items: baseline; gap: .12em;
+  }
+  .t12 .ampm { font-size: .24em; font-weight: 700; letter-spacing: .02em; }
+  .t12 .sec  { opacity: .62; }
+
+  .divider {
+    width: min(70%, 420px);
+    height: 1px;
+    background: var(--line);
+    margin: clamp(1.2rem, 4vh, 2.2rem) auto;
+  }
+  .t24 {
+    font-weight: 500;
+    font-size: clamp(1.7rem, min(7vw, 9.5vh), 4.5rem);
+    line-height: 1;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+  }
+  .label { margin-top: .6rem; font-size: clamp(.8rem, 2vw, 1rem); color: var(--fg-soft); }
+  .zone  { margin-top: clamp(1.5rem, 5vh, 2.5rem); font-size: clamp(.8rem, 2vw, .95rem); color: var(--fg-soft); }
+
+  svg.andes { position: fixed; pointer-events: none; left: 0; right: 0; bottom: 0; width: 100%; height: 30vh; height: 30dvh; min-height: 120px; max-height: 40vh; z-index: 1; display: block; }
+  svg.andes .far  { fill: var(--ridge-2); }
+  svg.andes .near { fill: var(--ridge); }
+
+  .weather { margin: clamp(1.4rem, 4vh, 2.2rem) auto 0; width: min(100%, 32rem); }
+  .weather .wplace { font-size: clamp(.85rem, 2vw, 1rem); color: var(--fg-soft); }
+  .weather .wmain { margin-top: .4rem; display: flex; justify-content: center; align-items: center; gap: .9rem; }
+  .weather .wicon { font-size: clamp(2.4rem, 8vw, 3.4rem); line-height: 1; }
+  .weather .wtemp { font-size: clamp(2.4rem, 8vw, 3.6rem); font-weight: 300; line-height: 1; letter-spacing: -.02em; }
+  .weather .wcond { font-size: clamp(1rem, 2.6vw, 1.2rem); font-weight: 500; margin-top: .2rem; }
+  .weather .wrow { margin-top: .9rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr)); gap: .5rem; font-size: clamp(.8rem, 2.2vw, .95rem); color: var(--fg-soft); }
+  .weather .wrow span { display: flex; flex-direction: column; align-items: center; gap: .1rem; padding: .5rem .35rem; border-radius: 14px; background: rgba(255,255,255,.08); border: 1px solid var(--line); }
+  .weather .wrow b { color: var(--fg); font-weight: 700; font-size: 1.1em; }
+  .weather .wnote { margin-top: .7rem; font-size: .8rem; color: var(--fg-soft); }
+
+  canvas#fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+  .fx-tabs { margin-top: .5rem; display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; }
+  .fx-tabs button { font: inherit; font-size: .78rem; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: .3rem .75rem; cursor: pointer; }
+  .fx-tabs button[aria-pressed="true"] { background: var(--fg); color: var(--sky-top); border-color: var(--fg); }
+  .fx-tabs button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+
+  canvas#sea { position: fixed; left: 0; bottom: 0; width: 100%; z-index: 2; pointer-events: none; display: block; }
+  .glass {
+    max-width: 55rem; margin: 0 auto;
+    padding: clamp(1.4rem, 4.5vw, 2.8rem) clamp(1rem, 4vw, 2.6rem);
+    border-radius: clamp(22px, 4vw, 36px);
+    background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,0) 50%), rgba(10,22,44,.28);
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 70px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.35);
+    -webkit-backdrop-filter: blur(16px) saturate(1.25);
+    backdrop-filter: blur(16px) saturate(1.25);
+  }
+  .controls { position: fixed; z-index: 3; top: calc(env(safe-area-inset-top, 0px) + .8rem); right: calc(env(safe-area-inset-right, 0px) + .8rem); display: flex; gap: .5rem; transition: opacity .5s; }
+  .controls button { display: inline-flex; align-items: center; gap: .45rem; font: inherit; font-size: .82rem; font-weight: 500; color: var(--fg); cursor: pointer; padding: .5rem .85rem; border-radius: 999px; border: 1px solid var(--line); background: rgba(10,22,44,.28); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .clockcol { min-width: 0; }
+  .controls button[hidden] { display: none; }
+  .controls button:hover { background: rgba(10,22,44,.42); }
+  .controls button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .controls button[aria-pressed="false"] .w, .controls button[aria-pressed="true"] .x { display: none; }
+  html.idle .controls { opacity: 0; pointer-events: none; }
+  html.idle, html.idle body { cursor: none; }
+  .controls button { min-height: 44px; }
+  @media (max-width: 520px) { .controls .lbl { display: none; } .controls button { padding: 0; width: 44px; justify-content: center; } }
+
+
+  /* ---------- Responsive ---------- */
+  /* Celular vertical: dejar espacio a los botones y aprovechar el ancho */
+  @media (max-width: 600px) {
+    main { padding-top: 4rem; padding-bottom: max(14vh, 120px); }
+    .glass { padding: 1.4rem 1rem; border-radius: 24px; }
+    .t12 { gap: .08em; }
+    .divider { width: 80%; }
+  }
+  @media (max-width: 360px) {
+    .t12 { font-size: 2.5rem; }
+    .weather .wrow { grid-template-columns: repeat(2, 1fr); }
+  }
+  /* Tablet vertical */
+  @media (min-width: 601px) and (max-width: 1024px) and (orientation: portrait) {
+    main { padding-top: 4.5rem; }
+    .glass { padding-block: 2.6rem; }
+  }
+  /* Pantallas bajas y apaisadas (celular o tablet horizontal): dos columnas */
+  @media (orientation: landscape) and (max-height: 560px) {
+    main { width: min(100%, 64rem); padding-top: 3.6rem; padding-bottom: 100px; }
+    .glass { display: grid; grid-template-columns: 1.25fr 1fr; align-items: center; gap: 1rem clamp(1rem, 3vw, 2.4rem); padding: 1.1rem 1.4rem; border-radius: 24px; max-width: none; }
+    .t12 { margin-top: .8rem; font-size: clamp(2.4rem, min(9vw, 17vh), 5.5rem); }
+    .t24 { font-size: clamp(1.5rem, min(5vw, 9vh), 3rem); }
+    .divider { margin: .8rem auto; }
+    .weather { margin: 0; width: 100%; padding-left: clamp(1rem, 3vw, 2.4rem); border-left: 1px solid var(--line); }
+    .weather .wrow { grid-template-columns: repeat(auto-fit, minmax(4.4rem, 1fr)); }
+    .zone { margin-top: .8rem; }
+    svg.andes { height: 22vh; min-height: 80px; }
+    .controls { top: calc(env(safe-area-inset-top, 0px) + .5rem); }
+  }
+  /* Notch / barra lateral en horizontal */
+  @supports (padding: max(0px)) {
+    main { padding-left: max(clamp(.75rem, 5vw, 3rem), env(safe-area-inset-left, 0px)); padding-right: max(clamp(.75rem, 5vw, 3rem), env(safe-area-inset-right, 0px)); }
+  }
+
+  .t12 .sep { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .t12 .sep { animation: none; } }
+</style>
+</head>
+<body>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <canvas id="sea" aria-hidden="true"></canvas>
+
+  <div class="controls">
+    <button type="button" id="btnSound" aria-pressed="false" title="Sonido ambiente" aria-label="Sonido ambiente">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="w" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/><path class="x" d="m16 9 5 6m0-6-5 6"/></svg>
+      <span class="lbl">Sonido</span>
+    </button>
+    <button type="button" id="btnFs" title="Pantalla completa" aria-label="Pantalla completa" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      <span class="lbl">Pantalla completa</span>
+    </button>
+  </div>
+
+  <main>
+    <div class="glass">
+    <div class="clockcol">
+    <p class="place">Santiago de Chile</p>
+    <p class="date" id="date">&nbsp;</p>
+
+    <div class="t12" id="t12" aria-label="Hora en formato de 12 horas">
+      <span id="h12">--</span><span class="sep">:</span><span id="m12">--</span><span class="sec">:<span id="s12">--</span></span>
+      <span class="ampm" id="ampm">--</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="t24" id="t24" aria-label="Hora en formato de 24 horas">--:--:--</div>
+    <p class="label">Formato de 24 horas</p>
+    </div>
+
+    <section class="weather" aria-live="polite">
+      <p class="wplace">Clima de hoy en Talcahuano, Biobío</p>
+      <div class="wmain">
+        <span class="wicon" id="wicon" aria-hidden="true"></span>
+        <div>
+          <div class="wtemp" id="wtemp">--°</div>
+          <div class="wcond" id="wcond">Cargando clima…</div>
+        </div>
+      </div>
+      <div class="wrow" id="wrow"></div>
+      <p class="wnote" id="wnote"></p>
+    </section>
+    </div>
+  </main>
+
+  <svg class="andes" viewBox="0 0 1440 300" preserveAspectRatio="none" aria-hidden="true">
+    <path class="far" d="M0 300V170l90-60 80 40 110-90 100 80 90-50 120 100 100-70 130 90 110-110 120 100 90-40 100 70 100-50 90 70v90z"/>
+    <path class="near" d="M0 300V230l120-50 90 40 130-70 110 70 120-40 140 60 110-60 150 70 120-50 110 50 130-40v140z"/>
+  </svg>
+
+<script>
+(function () {
+  var TZ = "America/Santiago";
+  var $ = function (id) { return document.getElementById(id); };
+
+  var f12 = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true });
+  var f24 = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  var fDate = new Intl.DateTimeFormat("es-CL", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  var fOff = new Intl.DateTimeFormat("en-US", { timeZone: TZ, timeZoneName: "shortOffset" });
+
+  function part(parts, type) {
+    for (var i = 0; i < parts.length; i++) if (parts[i].type === type) return parts[i].value;
+    return "";
+  }
+
+  var lastPhase = "", lastDate = "";
+
+  /* ---------- Cielo continuo según la hora (amanecer, día, atardecer, noche) ---------- */
+  var hNow = 0, daylight = 0, sr = 6.75, ss = 20.8, skyC = null; /* amanecer y atardecer en horas decimales */
+  var NIGHT = [[5,13,31],[15,36,71],[31,67,115],[8,20,42],[13,32,64]];
+  var DAWN  = [[58,58,122],[200,104,138],[255,183,133],[42,35,80],[74,55,104]];
+  var DAY   = [[24,92,184],[58,138,226],[140,200,245],[43,79,122],[74,118,166]];
+  var DUSK  = [[42,33,84],[181,71,106],[255,154,90],[27,20,56],[58,36,80]];
+  var SKYVARS = ["--sky-top", "--sky-mid", "--sky-low", "--ridge", "--ridge-2"];
+
+  function mixC(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+  function skyAt(h) {
+    var K = [[0, NIGHT, 0], [sr - 1.2, NIGHT, 0], [sr, DAWN, .5], [sr + 1.6, DAY, 1], [ss - 1.8, DAY, 1], [ss, DUSK, .5], [ss + 1.3, NIGHT, 0], [24, NIGHT, 0]];
+    for (var i = 0; i < K.length - 1; i++) {
+      if (h >= K[i][0] && h <= K[i + 1][0]) {
+        var span = K[i + 1][0] - K[i][0], t = span ? (h - K[i][0]) / span : 0;
+        return { c: K[i][1].map(function (c, n) { return mixC(c, K[i + 1][1][n], t); }), d: K[i][2] + (K[i + 1][2] - K[i][2]) * t };
+      }
+    }
+    return { c: NIGHT, d: 0 };
+  }
+  function applySky() {
+    var r = skyAt(hNow), st = document.documentElement.style;
+    daylight = r.d; skyC = r.c;
+    for (var i = 0; i < SKYVARS.length; i++) {
+      var c = r.c[i];
+      st.setProperty(SKYVARS[i], "rgb(" + Math.round(c[0]) + "," + Math.round(c[1]) + "," + Math.round(c[2]) + ")");
+    }
+  }
+
+  function phaseFor(h) {
+    if (h >= 6 && h < 8) return "dawn";
+    if (h >= 8 && h < 18) return "day";
+    if (h >= 18 && h < 20) return "dusk";
+    return "night";
+  }
+
+  function tick() {
+    var now = new Date();
+    var p12 = f12.formatToParts(now);
+    var p24 = f24.formatToParts(now);
+
+    $("h12").textContent = part(p12, "hour");
+    $("m12").textContent = part(p12, "minute");
+    $("s12").textContent = part(p12, "second");
+    $("ampm").textContent = part(p12, "dayPeriod").replace(/\./g, "").toUpperCase();
+
+    var h = part(p24, "hour"), m = part(p24, "minute"), s = part(p24, "second");
+    $("t24").textContent = h + ":" + m + ":" + s;
+
+    hNow = parseInt(h, 10) + parseInt(m, 10) / 60 + parseInt(s, 10) / 3600;
+    applySky();
+
+    var d = fDate.format(now);
+    if (d !== lastDate) {
+      lastDate = d;
+      $("date").textContent = d;
+      var off = part(fOff.formatToParts(now), "timeZoneName").replace("GMT", "UTC").replace("-", "\u2212");
+    }
+
+    setTimeout(tick, 1000 - (now.getMilliseconds()));
+  }
+  tick();
+
+  /* ---------- Fondo animado según el clima ---------- */
+  var cv = $("fx"), cx = cv.getContext("2d");
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var W = 0, H = 0, scene = { kind: "cloudy", isDay: lastPhase !== "night" };
+  var real = { kind: scene.kind, isDay: scene.isDay }, preview = false;
+  var stars = [], clouds = [], drops = [], flakes = [], flash = 0, nextFlash = 3, lastT = 0, clock = 0;
+  var birds = [], nextBird = 4, celX = 0, celA = 0, celUp = true, celRGB = "255,214,160";
+  var sea = $("sea"), sx = sea.getContext("2d"), SH = 100;
+
+  function kindOf(c) {
+    if (c === 0 || c === 1) return "clear";
+    if (c === 2) return "partly";
+    if (c === 45 || c === 48) return "fog";
+    if (c >= 51 && c <= 55) return "drizzle";
+    if ((c >= 61 && c <= 65) || c === 80 || c === 81) return "rain";
+    if (c === 82 || c >= 95) return "storm";
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "snow";
+    return "cloudy";
+  }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+
+  function build() {
+    var k = scene.kind, wet = k === "drizzle" || k === "rain" || k === "storm";
+    stars = []; clouds = []; drops = []; flakes = [];
+    for (var i = 0; i < 110; i++) stars.push({ x: Math.random() * W, y: Math.random() * H * 0.65, r: rnd(.4, 1.5), ph: rnd(0, 6.28) });
+    var nc = { clear: 0, partly: 5, cloudy: 9, fog: 6, drizzle: 10, rain: 11, storm: 12, snow: 8 }[k] || 0;
+    nc = Math.round(nc * Math.min(1, Math.max(.55, W / 900)));
+    for (i = 0; i < nc; i++) {
+      var low = k === "fog";
+      clouds.push({ x: rnd(-W * .3, W * 1.1), y: low ? rnd(H * .4, H * .85) : rnd(-H * .02, H * .5), s: low ? rnd(260, 480) : rnd(150, 340), v: rnd(6, 20), a: low ? rnd(.16, .3) : rnd(.28, .55), ph: rnd(0, 6.28) });
+    }
+    if (wet) {
+      var area = W * H, n = Math.round(area / (k === "storm" ? 2800 : k === "rain" ? 4500 : 9000));
+      for (i = 0; i < n; i++) drops.push({ x: Math.random() * W, y: Math.random() * H, l: k === "drizzle" ? rnd(6, 12) : rnd(11, 24), v: k === "drizzle" ? rnd(380, 520) : rnd(650, 1050) });
+    }
+    if (k === "snow") {
+      for (i = 0; i < Math.round(W * H / 9000); i++) flakes.push({ x: Math.random() * W, y: Math.random() * H, r: rnd(1.2, 3.4), v: rnd(24, 70), ph: rnd(0, 6.28) });
+    }
+  }
+
+  function setScene(kind, isDay) { scene = { kind: kind, isDay: isDay }; build(); updateSound(); if (reduce) frame(lastT); }
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    SH = Math.max(90, Math.round(H * .13));
+    sea.width = Math.round(W * dpr); sea.height = Math.round(SH * dpr); sea.style.height = SH + "px";
+    sx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    build();
+    if (reduce) frame(lastT);
+  }
+
+  function cloudRGB() {
+    var k = scene.kind, wet = k === "drizzle" || k === "rain" || k === "storm", n, d, c;
+    if (k === "fog") { n = [140, 156, 182]; d = [228, 234, 240]; }
+    else if (wet) { n = [72, 88, 112]; d = [150, 162, 176]; }
+    else if (k === "snow") { n = [110, 128, 156]; d = [214, 224, 236]; }
+    else { n = [122, 142, 176]; d = [255, 255, 255]; }
+    c = mixC(n, d, daylight);
+    var twi = 1 - Math.abs(2 * daylight - 1); /* máximo al amanecer y atardecer */
+    c = mixC(c, wet ? [210, 150, 130] : [255, 168, 130], twi * (wet ? .25 : .5));
+    return Math.round(c[0]) + "," + Math.round(c[1]) + "," + Math.round(c[2]);
+  }
+
+  /* mar: ondas suaves y reflejo del sol o la luna */
+  function drawSea(k) {
+    var c = skyC || NIGHT, i, j, g;
+    var a = mixC(c[2], [8, 40, 72], .45), b = mixC(c[3], [2, 14, 32], .35);
+    sx.clearRect(0, 0, W, SH);
+    g = sx.createLinearGradient(0, 0, 0, SH);
+    g.addColorStop(0, "rgb(" + a.map(Math.round).join(",") + ")");
+    g.addColorStop(1, "rgb(" + b.map(Math.round).join(",") + ")");
+    sx.fillStyle = g; sx.fillRect(0, 0, W, SH);
+
+    if (celA > .02) {
+      g = sx.createRadialGradient(celX, 0, 0, celX, 0, SH * 1.3);
+      g.addColorStop(0, "rgba(" + celRGB + "," + (.3 * celA).toFixed(3) + ")"); g.addColorStop(1, "rgba(" + celRGB + ",0)");
+      sx.fillStyle = g; sx.fillRect(0, 0, W, SH);
+    }
+
+    var amp = k === "storm" ? 5 : (k === "rain" ? 3.5 : 2.2), sp = k === "storm" ? 1.6 : 1;
+    sx.lineWidth = 1; sx.strokeStyle = "rgba(255,255,255," + (.07 + .05 * daylight).toFixed(3) + ")";
+    for (i = 0; i < 5; i++) {
+      sx.beginPath();
+      var yb = SH * (.14 + i * .17);
+      for (var x = 0; x <= W + 14; x += 14) {
+        var y = yb + Math.sin(x * .018 + clock * (.7 + i * .15) * sp + i) * amp * (.5 + i * .25);
+        if (x) sx.lineTo(x, y); else sx.moveTo(x, y);
+      }
+      sx.stroke();
+    }
+
+    if (celA > .02) {
+      sx.lineCap = "round"; sx.lineWidth = 2;
+      for (j = 0; j < 16; j++) {
+        var ry = 4 + j * (SH - 8) / 16, half = 14 + j * 11;
+        for (i = 0; i < 4; i++) {
+          var rx = celX + Math.sin(clock * (.9 + i * .37) + j * 1.7 + i * 2.1) * half * .55;
+          var len = 6 + j * 1.6 * (.6 + .4 * Math.sin(clock * 1.3 + i + j));
+          var al = celA * (1 - j / 18) * (.35 + .35 * Math.sin(clock * 2 + i * 1.3 + j * .9));
+          sx.strokeStyle = "rgba(" + celRGB + "," + Math.max(0, al).toFixed(3) + ")";
+          sx.beginPath(); sx.moveTo(rx - len / 2, ry); sx.lineTo(rx + len / 2, ry); sx.stroke();
+        }
+      }
+    }
+  }
+
+  var DARK = { clear: 0, partly: .05, cloudy: .18, fog: .1, drizzle: .26, rain: .36, storm: .52, snow: .14 };
+  var SUNMOON = { clear: 1, partly: .85, cloudy: .3, fog: .12, drizzle: 0, rain: 0, storm: 0, snow: 0 };
+
+  function frame(t) {
+    var dt = reduce ? 0 : Math.min((t - lastT) / 1000, .05);
+    lastT = t; clock = t / 1000;
+    var k = scene.kind, day = daylight > .5, i, g;
+    cx.clearRect(0, 0, W, H);
+
+    /* oscurecer el cielo según lo cubierto que esté */
+    if (DARK[k]) { cx.fillStyle = "rgba(22,32,48," + DARK[k] + ")"; cx.fillRect(0, 0, W, H); }
+
+    /* estrellas */
+    {
+      var sa = ({ clear: 1, partly: .65, cloudy: .22 }[k] || 0) * Math.max(0, Math.min(1, (.7 - daylight) / .45));
+      if (sa > .01) for (i = 0; i < stars.length; i++) {
+        var s = stars[i];
+        cx.globalAlpha = sa * (.55 + .45 * Math.sin(clock * 1.3 + s.ph));
+        cx.fillStyle = "#fff";
+        cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.2832); cx.fill();
+      }
+      cx.globalAlpha = 1;
+    }
+
+    /* sol o luna */
+    var sm = SUNMOON[k] || 0;
+    celA = 0;
+    if (sm) {
+      var up = hNow >= sr - .4 && hNow <= ss + .4;
+      var pp = up ? (hNow - sr) / (ss - sr) : ((hNow - ss + 24) % 24) / (24 - (ss - sr));
+      pp = Math.max(-.03, Math.min(1.03, pp));
+      var gx = W * (.1 + .8 * pp), gy = H * .76 - H * .6 * Math.sin(Math.PI * pp), R = Math.min(Math.max(W, H) * .5, 520);
+      var sh = Math.sin(Math.PI * pp);
+      celX = gx; celUp = up; celA = sm * Math.max(0, Math.min(1, sh * 6));
+      celRGB = up ? "255," + Math.round(170 + 70 * sh) + "," + Math.round(120 + 90 * sh) : "205,222,255";
+      cx.globalAlpha = sm;
+      if (up) {
+        var pulse = 1 + .04 * Math.sin(clock * .8);
+        g = cx.createRadialGradient(gx, gy, 0, gx, gy, R * pulse);
+        var wg = Math.round(150 + 98 * Math.sin(Math.PI * pp)), wb = Math.round(95 + 119 * Math.sin(Math.PI * pp));
+        g.addColorStop(0, "rgba(255," + wg + "," + wb + ",.98)"); g.addColorStop(.05, "rgba(255," + (wg - 16) + "," + (wb - 50) + ",.8)");
+        g.addColorStop(.28, "rgba(255," + (wg - 40) + "," + (wb - 70) + ",.26)"); g.addColorStop(1, "rgba(255," + (wg - 40) + "," + (wb - 70) + ",0)");
+        cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+      } else {
+        g = cx.createRadialGradient(gx, gy, 0, gx, gy, 170);
+        g.addColorStop(0, "rgba(190,215,255,.38)"); g.addColorStop(1, "rgba(190,215,255,0)");
+        cx.fillStyle = g; cx.fillRect(gx - 180, gy - 180, 360, 360);
+        g = cx.createRadialGradient(gx - 8, gy - 8, 2, gx, gy, 30);
+        g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#cfdcf2");
+        cx.fillStyle = g; cx.beginPath(); cx.arc(gx, gy, 28, 0, 6.2832); cx.fill();
+      }
+      cx.globalAlpha = 1;
+    }
+
+    /* nubes */
+    var col = cloudRGB();
+    for (i = 0; i < clouds.length; i++) {
+      var c = clouds[i];
+      c.x += c.v * dt;
+      if (c.x > W + c.s) c.x = -c.s * 1.5;
+      for (var j = 0; j < 5; j++) {
+        var px = c.x + (j - 2) * c.s * .32, py = c.y + Math.sin(j * 1.7 + c.ph) * c.s * .08, r = c.s * (.34 + .1 * Math.sin(j * 2.3 + c.ph));
+        g = cx.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0, "rgba(" + col + "," + c.a + ")"); g.addColorStop(1, "rgba(" + col + ",0)");
+        cx.fillStyle = g; cx.beginPath(); cx.arc(px, py, r, 0, 6.2832); cx.fill();
+      }
+    }
+
+    /* niebla: franjas que se desplazan */
+    if (k === "fog") {
+      for (i = 0; i < 4; i++) {
+        var fy = H * (.38 + i * .16), off = Math.sin(clock * .12 + i * 1.9) * 60;
+        g = cx.createLinearGradient(0, fy - 120, 0, fy + 120);
+        g.addColorStop(0, "rgba(" + col + ",0)"); g.addColorStop(.5, "rgba(" + col + ",.2)"); g.addColorStop(1, "rgba(" + col + ",0)");
+        cx.fillStyle = g; cx.fillRect(off - 80, fy - 120, W + 160, 240);
+      }
+    }
+
+    /* lluvia */
+    if (drops.length) {
+      cx.strokeStyle = day ? "rgba(215,230,248,.5)" : "rgba(185,205,235,.4)";
+      cx.lineWidth = 1.2; cx.lineCap = "round";
+      cx.beginPath();
+      for (i = 0; i < drops.length; i++) {
+        var d = drops[i];
+        d.y += d.v * dt; d.x += d.v * .16 * dt;
+        if (d.y > H) { d.y = -d.l; d.x = Math.random() * W; }
+        if (d.x > W) d.x = -5;
+        cx.moveTo(d.x, d.y); cx.lineTo(d.x - d.l * .16, d.y - d.l);
+      }
+      cx.stroke();
+    }
+
+    /* nieve */
+    if (flakes.length) {
+      cx.fillStyle = "rgba(255,255,255,.88)";
+      for (i = 0; i < flakes.length; i++) {
+        var f = flakes[i];
+        f.y += f.v * dt; f.x += Math.sin(clock * .8 + f.ph) * 22 * dt;
+        if (f.y > H + 5) { f.y = -5; f.x = Math.random() * W; }
+        cx.beginPath(); cx.arc(f.x, f.y, f.r, 0, 6.2832); cx.fill();
+      }
+    }
+
+    /* relámpago: un destello suave y espaciado */
+    if (k === "storm" && !reduce) {
+      nextFlash -= dt;
+      if (nextFlash <= 0) { flash = .32; nextFlash = rnd(5, 11); }
+      if (flash > .01) { cx.fillStyle = "rgba(235,242,255," + flash + ")"; cx.fillRect(0, 0, W, H); flash *= Math.pow(.02, dt); }
+    }
+
+    /* aves cruzando el cielo */
+    if (!reduce) {
+      var calm = k === "clear" || k === "partly" || k === "cloudy";
+      nextBird -= dt;
+      if (!birds.length && nextBird <= 0 && calm && daylight > .2) {
+        var bs = W < 600 ? .75 : 1, by = rnd(H * .14, H * .42), bv = rnd(55, 85), dir = Math.random() < .5 ? 1 : -1;
+        var bn = 5 + Math.floor(Math.random() * 4);
+        for (i = 0; i < bn; i++) {
+          var row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+          birds.push({ x: (dir > 0 ? -80 : W + 80) - row * 26 * bs * dir, y: by + row * 12 * bs * side, s: rnd(6, 9) * bs, ph: rnd(0, 6.28), v: bv * dir });
+        }
+        nextBird = rnd(25, 50);
+      }
+      if (birds.length) {
+        cx.strokeStyle = "rgba(18,24,40," + (.55 + .2 * (1 - daylight)).toFixed(2) + ")";
+        cx.lineWidth = 1.6; cx.lineCap = "round";
+        for (i = 0; i < birds.length; i++) {
+          var bd = birds[i], wing = Math.sin(clock * 7 + bd.ph) * bd.s * .45;
+          bd.x += bd.v * dt;
+          cx.beginPath();
+          cx.moveTo(bd.x - bd.s, bd.y - wing);
+          cx.quadraticCurveTo(bd.x - bd.s * .4, bd.y - wing * .9 - bd.s * .12, bd.x, bd.y);
+          cx.quadraticCurveTo(bd.x + bd.s * .4, bd.y - wing * .9 - bd.s * .12, bd.x + bd.s, bd.y - wing);
+          cx.stroke();
+        }
+        if (birds[0].x > W + 260 || birds[0].x < -260) birds = [];
+      }
+    }
+
+    drawSea(k);
+
+    if (!reduce) requestAnimationFrame(frame);
+  }
+
+  resize();
+  var rzT = 0, lastW = W, lastH = H;
+  function onResize() {
+    clearTimeout(rzT);
+    rzT = setTimeout(function () {
+      var nw = window.innerWidth, nh = window.innerHeight;
+      if (nw === lastW && Math.abs(nh - lastH) < 140) return; /* barra de direcciones del móvil */
+      lastW = nw; lastH = nh; resize();
+    }, 150);
+  }
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", function () { setTimeout(function () { lastW = -1; onResize(); }, 250); });
+  if (!reduce) requestAnimationFrame(frame);
+
+  /* ---------- Sonido ambiente (sintetizado, sin archivos) ---------- */
+  var AC = null, master, gRain, gWind, gWave, soundOn = false, btnS = $("btnSound");
+  function noise(type) {
+    var len = AC.sampleRate * 4, buf = AC.createBuffer(1, len, AC.sampleRate), d = buf.getChannelData(0), last = 0;
+    for (var i = 0; i < len; i++) {
+      var w = Math.random() * 2 - 1;
+      if (type === "brown") { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+    }
+    var s = AC.createBufferSource(); s.buffer = buf; s.loop = true; return s;
+  }
+  function initSound() {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    AC = new Ctx();
+    master = AC.createGain(); master.gain.value = 0; master.connect(AC.destination);
+
+    var rs = noise("white"), rf = AC.createBiquadFilter();
+    rf.type = "bandpass"; rf.frequency.value = 3400; rf.Q.value = .7;
+    gRain = AC.createGain(); gRain.gain.value = 0;
+    rs.connect(rf); rf.connect(gRain); gRain.connect(master); rs.start();
+
+    var ws = noise("brown"), wf = AC.createBiquadFilter();
+    wf.type = "lowpass"; wf.frequency.value = 520; wf.Q.value = .5;
+    gWind = AC.createGain(); gWind.gain.value = 0;
+    ws.connect(wf); wf.connect(gWind); gWind.connect(master); ws.start();
+    var l1 = AC.createOscillator(), lg1 = AC.createGain();
+    l1.frequency.value = .13; lg1.gain.value = 260; l1.connect(lg1); lg1.connect(wf.frequency); l1.start();
+
+    var vs = noise("brown"), vf = AC.createBiquadFilter(), vm = AC.createGain();
+    vf.type = "lowpass"; vf.frequency.value = 700; vm.gain.value = .55;
+    gWave = AC.createGain(); gWave.gain.value = 0;
+    vs.connect(vf); vf.connect(vm); vm.connect(gWave); gWave.connect(master); vs.start();
+    var l2 = AC.createOscillator(), lg2 = AC.createGain();
+    l2.frequency.value = .1; lg2.gain.value = .45; l2.connect(lg2); lg2.connect(vm.gain); l2.start();
+    return true;
+  }
+  function updateSound() {
+    if (!AC) return;
+    var k = scene.kind, t = AC.currentTime;
+    var rain = { drizzle: .1, rain: .26, storm: .38 }[k] || 0;
+    var wind = { clear: .1, partly: .14, cloudy: .2, fog: .1, drizzle: .18, rain: .24, storm: .5, snow: .22 }[k] || .12;
+    var wave = { storm: .75, rain: .5, drizzle: .45 }[k] || .4;
+    gRain.gain.setTargetAtTime(rain, t, .8);
+    gWind.gain.setTargetAtTime(wind, t, .8);
+    gWave.gain.setTargetAtTime(wave, t, .8);
+  }
+  btnS.addEventListener("click", function () {
+    if (!AC && !initSound()) { btnS.hidden = true; return; }
+    soundOn = !soundOn;
+    btnS.setAttribute("aria-pressed", soundOn ? "true" : "false");
+    if (soundOn) {
+      AC.resume(); updateSound();
+      master.gain.setTargetAtTime(.8, AC.currentTime, .4);
+    } else {
+      master.gain.setTargetAtTime(0, AC.currentTime, .3);
+      setTimeout(function () { if (!soundOn && AC) AC.suspend(); }, 1500);
+    }
+  });
+
+  /* ---------- Pantalla completa (reloj de escritorio o velador) ---------- */
+  var btnF = $("btnFs"), root = document.documentElement, idleT = 0, wake = null;
+  function lockScreen(on) {
+    try {
+      if (on && navigator.wakeLock) navigator.wakeLock.request("screen").then(function (l) { wake = l; }).catch(function () {});
+      else if (!on && wake) { wake.release(); wake = null; }
+    } catch (e) {}
+  }
+  function setIdle() {
+    clearTimeout(idleT);
+    root.classList.remove("idle");
+    if (document.fullscreenElement) idleT = setTimeout(function () { root.classList.add("idle"); }, 3000);
+  }
+  if (document.fullscreenEnabled && root.requestFullscreen) {
+    btnF.hidden = false;
+    btnF.addEventListener("click", function () {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else root.requestFullscreen().catch(function () { btnF.hidden = true; });
+    });
+    document.addEventListener("fullscreenchange", function () {
+      var on = !!document.fullscreenElement;
+      btnF.setAttribute("aria-label", on ? "Salir de pantalla completa" : "Pantalla completa");
+      btnF.querySelector(".lbl").textContent = on ? "Salir" : "Pantalla completa";
+      lockScreen(on); setIdle();
+    });
+    ["mousemove", "touchstart", "keydown", "pointerdown"].forEach(function (ev) { document.addEventListener(ev, setIdle, { passive: true }); });
+    document.addEventListener("visibilitychange", function () { if (!document.hidden && document.fullscreenElement) lockScreen(true); });
+  }
+
+  /* ---------- Clima de Talcahuano ---------- */
+  var WMO = {
+    0: ["Despejado", "☀️", "🌙"], 1: ["Mayormente despejado", "🌤️", "🌙"], 2: ["Parcialmente nublado", "⛅", "☁️"],
+    3: ["Nublado", "☁️", "☁️"], 45: ["Niebla", "🌫️", "🌫️"], 48: ["Niebla con escarcha", "🌫️", "🌫️"],
+    51: ["Llovizna ligera", "🌦️", "🌧️"], 53: ["Llovizna", "🌦️", "🌧️"], 55: ["Llovizna intensa", "🌧️", "🌧️"],
+    61: ["Lluvia ligera", "🌦️", "🌧️"], 63: ["Lluvia", "🌧️", "🌧️"], 65: ["Lluvia fuerte", "🌧️", "🌧️"],
+    80: ["Chubascos", "🌦️", "🌧️"], 81: ["Chubascos", "🌧️", "🌧️"], 82: ["Chubascos fuertes", "⛈️", "⛈️"],
+    95: ["Tormenta eléctrica", "⛈️", "⛈️"], 96: ["Tormenta con granizo", "⛈️", "⛈️"], 99: ["Tormenta con granizo", "⛈️", "⛈️"]
+  };
+  function wmo(code, isDay) {
+    var w = WMO[code] || (code >= 71 && code <= 77 ? ["Nieve", "🌨️", "🌨️"] : ["Variable", "⛅", "☁️"]);
+    return { text: w[0], icon: isDay ? w[1] : w[2] };
+  }
+
+  /* Respaldo: pronóstico del 10-11-2026 (se usa solo ese día si no hay conexión en vivo) */
+  var SNAPSHOT = { date: "2026-11-10", temp: 15.8, code: 3, isDay: false, max: 20.3, min: 13.5, rain: 20, wind: null, hum: null };
+
+  function renderWeather(d, live) {
+    var w = wmo(d.code, d.isDay);
+    real = { kind: kindOf(d.code), isDay: d.isDay };
+    if (!preview) setScene(real.kind, real.isDay);
+    $("wicon").textContent = w.icon;
+    $("wtemp").textContent = Math.round(d.temp) + "°C";
+    $("wcond").textContent = w.text;
+    var items = [
+      ["Máx", Math.round(d.max) + "°"],
+      ["Mín", Math.round(d.min) + "°"],
+      ["Lluvia", d.rain + "%"]
+    ];
+    if (d.wind != null) items.push(["Viento", Math.round(d.wind) + " km/h"]);
+    if (d.hum != null) items.push(["Humedad", Math.round(d.hum) + "%"]);
+    if (d.sunrise) items.push(["Amanecer", d.sunrise]);
+    if (d.sunset) items.push(["Atardecer", d.sunset]);
+    var row = $("wrow");
+    row.textContent = "";
+    items.forEach(function (it) {
+      var s = document.createElement("span");
+      s.append(it[0] + " ");
+      var b = document.createElement("b");
+      b.textContent = it[1];
+      s.append(b);
+      row.append(s);
+    });
+    $("wnote").textContent = live ? "" : "Pronóstico del día (no se actualiza en esta vista)";
+  }
+
+  function todayCL() {
+    var p = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+    return p; /* AAAA-MM-DD */
+  }
+
+  function fallback() {
+    if (SNAPSHOT.date === todayCL()) { renderWeather(SNAPSHOT, false); return; }
+    $("wicon").textContent = "";
+    $("wtemp").textContent = "";
+    $("wcond").textContent = "Clima no disponible en esta vista";
+    $("wrow").textContent = "";
+    $("wnote").textContent = "Abre el archivo HTML desde tu computador para verlo en vivo.";
+  }
+
+  function loadWeather() {
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=-36.7167&longitude=-73.1167" +
+      "&current=temperature_2m,weather_code,is_day,wind_speed_10m,relative_humidity_2m" +
+      "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset" +
+      "&timezone=America%2FSantiago&forecast_days=1";
+    var done = false;
+    var timer = setTimeout(function () { if (!done) { done = true; fallback(); } }, 6000);
+    try {
+      fetch(url).then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); }).then(function (j) {
+        if (done) return;
+        done = true; clearTimeout(timer);
+        var sa0 = j.daily.sunrise && j.daily.sunrise[0], sb0 = j.daily.sunset && j.daily.sunset[0];
+        function hh(x) { var t = x.split("T")[1].split(":"); return +t[0] + +t[1] / 60; }
+        if (sa0 && sb0) { sr = hh(sa0); ss = hh(sb0); }
+        renderWeather({
+          temp: j.current.temperature_2m, code: j.current.weather_code, isDay: j.current.is_day === 1,
+          max: j.daily.temperature_2m_max[0], min: j.daily.temperature_2m_min[0],
+          rain: j.daily.precipitation_probability_max[0] || 0,
+          wind: j.current.wind_speed_10m, hum: j.current.relative_humidity_2m,
+          sunrise: sa0 ? sa0.split("T")[1] : null, sunset: sb0 ? sb0.split("T")[1] : null
+        }, true);
+      }).catch(function () { if (!done) { done = true; clearTimeout(timer); fallback(); } });
+    } catch (e) { done = true; clearTimeout(timer); fallback(); }
+  }
+  loadWeather();
+  setInterval(loadWeather, 15 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
